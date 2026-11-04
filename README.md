@@ -3,109 +3,118 @@
 <h1 align="center">Escale</h1>
 
 <p align="center">
-  A lightweight, native desktop client for <b>SSH, RDP and VNC</b> — single <code>.exe</code>, encrypted vault, jump hosts and a built-in per-host VPN.
+  <b>SSH · RDP · VNC</b> — native, lightweight, encrypted.<br>
+  Client SSH, RDP et VNC natif, léger et chiffré.
 </p>
 
 <p align="center">
-  <a href="https://github.com/nbstheo/Escale/releases/latest"><img alt="Latest release" src="https://img.shields.io/github/v/release/nbstheo/Escale?sort=semver"></a>
-  <a href="https://github.com/nbstheo/Escale/actions/workflows/ci.yml"><img alt="CI" src="https://github.com/nbstheo/Escale/actions/workflows/ci.yml/badge.svg"></a>
+  <a href="https://github.com/nbstheo/Escale/releases/latest"><img alt="Release" src="https://img.shields.io/github/v/release/nbstheo/Escale?sort=semver&label=release"></a>
   <a href="https://github.com/nbstheo/Escale/releases"><img alt="Downloads" src="https://img.shields.io/github/downloads/nbstheo/Escale/total"></a>
-  <img alt="Platform" src="https://img.shields.io/badge/platform-Windows%2010%20%7C%2011-0078D6">
+  <img alt="Windows 10 | 11" src="https://img.shields.io/badge/Windows-10%20%7C%2011-0078D6">
   <img alt="Rust" src="https://img.shields.io/badge/Rust-2024-orange">
-  <a href="LICENSE"><img alt="License: MIT" src="https://img.shields.io/badge/license-MIT-green"></a>
+  <a href="LICENSE"><img alt="MIT" src="https://img.shields.io/badge/license-MIT-green"></a>
 </p>
 
 <p align="center">
-  <b>English</b> · <a href="README.fr.md">Français</a>
+  <a href="https://github.com/nbstheo/Escale/releases/latest"><b>⬇ Download / Télécharger <code>Escale.exe</code></b></a>
+</p>
+
+<p align="center">
+  <a href="#english">English</a> · <a href="#français">Français</a>
 </p>
 
 ---
 
-Escale is a native desktop client (Rust + egui) inspired by Termius. Everything ships in one executable: no runtime, no admin rights, nothing installed on the rest of the system.
+## English
 
-> **Status:** early (0.x). Windows is the supported platform. The interface is currently in French.
+A native desktop client (Rust + egui) inspired by Termius. **One `.exe`, nothing to install**: no runtime, no admin rights.
 
-## Download
+> Early version (0.x). Windows 10 / 11. The interface is currently in French.
 
-| File | Description |
-|---|---|
-| [`Escale-Setup-<version>.exe`](https://github.com/nbstheo/Escale/releases/latest) | Installer (per-user, no admin rights required) |
-| [`Escale-<version>-portable.exe`](https://github.com/nbstheo/Escale/releases/latest) | Portable executable, just run it |
-| `SHA256SUMS.txt` | Checksums to verify your download |
-
-Get them from the **[latest release](https://github.com/nbstheo/Escale/releases/latest)**. Binaries are built and published by GitHub Actions from the tagged source.
-
-## Features
+### Features
 
 - **Unlimited hosts** (SSH, RDP, VNC) with groups, instant search and filters
-- **SSH**: password or key authentication (OpenSSH, PEM, PuTTY `.ppk`, passphrases), built-in xterm-256color terminal, **one-click key setup** (generates an ed25519 key and installs it in `authorized_keys`), host-key verification (TOFU) with change alerts
-- **SFTP file manager**: two columns (this PC / remote), drag and drop between them; over RDP, via a shared drive
-- **Jump hosts (ProxyJump)**: chains of any length with loop detection, through `direct-tcpip` channels (nothing is decrypted on the hops). RDP and VNC hosts can use jump hosts too
-- **RDP** (IronRDP): RDPGFX with H.264 (OpenH264), RemoteFX Progressive, ClearCodec; TLS + NLA/CredSSP/Kerberos, dynamic resolution, multi-monitor, audio and microphone, clipboard, shared folder, Windows shortcuts, auto-reconnect
+- **SSH**: password or key (OpenSSH, PEM, PuTTY `.ppk`, passphrases), xterm-256color terminal, **one-click key setup** (ed25519 key generated and added to `authorized_keys`), host-key verification with change alerts
+- **Files**: two-column manager (this PC / remote) with drag and drop — SFTP over SSH, shared drive over RDP
+- **Jump hosts (ProxyJump)**: chains of any length, nothing decrypted on the hops; RDP and VNC can use them too
+- **RDP** (IronRDP): H.264, RemoteFX, ClearCodec, NLA / Kerberos, dynamic resolution, **multi-monitor**, sound and microphone, clipboard, shared folder, Windows shortcuts, auto-reconnect
 - **VNC**: RFB 3.8, ZRLE / CopyRect / Raw
-- **Built-in VPN per host**: reusable **WireGuard** and **OpenVPN** profiles (including WatchGuard SSL VPN), imported from `.conf` / `.ovpn`. The tunnel runs inside the app (user-space TCP/IP stack): no network adapter, no admin rights, the rest of the PC is unaffected. VPN → jump hosts → target chains are supported
-- **Encrypted vault**: all data (hosts, passwords, keys, fingerprints) is encrypted on your device; encrypted export/import, several vaults per PC, optional 6-digit PIN
+- **Built-in VPN per host**: **WireGuard** and **OpenVPN** (including WatchGuard SSL VPN) from `.conf` / `.ovpn`. The tunnel runs inside the app — no network adapter, no admin rights, the rest of the PC is unaffected
+- **Encrypted vault**: hosts, passwords, keys and fingerprints encrypted on your device; encrypted export / import, several vaults per PC, optional 6-digit PIN
 
-## Security model
+### Security
 
-| Item | Choice |
+| | |
 |---|---|
-| Key derivation | Argon2id, 64 MiB, 3 iterations, random 16-byte salt |
-| Encryption | XChaCha20-Poly1305 (fresh random 24-byte nonce on every save) |
-| Integrity | Header (parameters + salt) authenticated as associated data |
-| PIN | Vault key wrapped with Argon2id(PIN) + XChaCha20-Poly1305, then Windows DPAPI; the file is consumed on each attempt and rewritten only if the PIN is correct |
-| Memory | Secrets are zeroized on lock / drop |
-| Storage | `%APPDATA%\Escale\Coffre1`, `Coffre2`… (`vault.escale`, `vault.pin`, `profil.json`) |
+| Key derivation | Argon2id (64 MiB, 3 iterations, random salt) |
+| Encryption | XChaCha20-Poly1305, fresh nonce on every save |
+| PIN | Vault key wrapped with Argon2id(PIN), then Windows DPAPI |
+| Memory | Secrets wiped on lock |
+| Storage | `%APPDATA%\Escale\Coffre1`, `Coffre2`… |
 
-The master password is never stored. **If you lose it, the vault cannot be recovered.**
-This project has not been independently audited — see [SECURITY.md](SECURITY.md).
+The master password is never stored: **if you lose it, the vault cannot be recovered.**
+Not independently audited — see [SECURITY.md](SECURITY.md).
 
-## Portable mode
+**Portable mode:** set `ESCALE_VAULT=path\to\vault.escale` to keep the vault elsewhere (e.g. a USB drive).
 
-Set `ESCALE_VAULT=path\to\vault.escale` to use a single vault stored elsewhere (e.g. a USB drive).
+### Terminal shortcuts
 
-## Build from source
+| Action | Shortcut |
+|---|---|
+| Copy | Ctrl+Shift+C, Ctrl+C (with selection), right click |
+| Paste | Ctrl+V |
+| Scroll history | Mouse wheel, Shift+PgUp / PgDn |
+| Files panel | Ctrl+Shift+E |
+| Type the saved password (sudo / su) | Ctrl+Shift+M |
+| Collapse sidebar | Ctrl+Shift+B |
 
-Requirements: Rust (stable, edition 2024) and the Visual Studio Build Tools (C++ workload).
+---
 
-```powershell
-cargo build --release          # -> target\release\escale.exe
-cargo test --release           # end-to-end tests with in-memory SSH / RDP / VNC / OpenVPN servers
-```
+## Français
 
-Windows installer (requires [Inno Setup 6](https://jrsoftware.org/isinfo.php)):
+Client de bureau natif (Rust + egui) inspiré de Termius. **Un seul `.exe`, rien à installer** : aucune dépendance, aucun droit administrateur.
 
-```powershell
-powershell -ExecutionPolicy Bypass -File installer\build.ps1   # -> dist\Escale-Setup-<version>.exe
-```
+> Version précoce (0.x). Windows 10 / 11.
 
-### Publishing a release
+### Fonctionnalités
 
-Bump `version` in `Cargo.toml`, commit, then push a matching tag — the [Release workflow](.github/workflows/release.yml) builds the installer and the portable exe and attaches them to a GitHub release:
+- **Hôtes illimités** (SSH, RDP, VNC) avec groupes, recherche instantanée et filtres
+- **SSH** : mot de passe ou clé (OpenSSH, PEM, PuTTY `.ppk`, phrase secrète), terminal xterm-256color, **clé en un clic** (clé ed25519 générée et ajoutée à `authorized_keys`), vérification des clés serveur avec alerte si elles changent
+- **Fichiers** : gestionnaire deux colonnes (ce PC / distant) avec glisser-déposer — SFTP en SSH, dossier partagé en RDP
+- **Rebonds (ProxyJump)** : chaînes de longueur quelconque, rien n'est déchiffré sur les rebonds ; utilisables aussi en RDP et VNC
+- **RDP** (IronRDP) : H.264, RemoteFX, ClearCodec, NLA / Kerberos, résolution dynamique, **multi-écrans**, son et micro, presse-papiers, dossier partagé, raccourcis Windows, reconnexion automatique
+- **VNC** : RFB 3.8, ZRLE / CopyRect / Raw
+- **VPN intégré par hôte** : **WireGuard** et **OpenVPN** (dont WatchGuard SSL VPN) depuis un `.conf` / `.ovpn`. Le tunnel tourne dans l'application — aucune carte réseau, aucun droit admin, le reste du PC n'est pas concerné
+- **Coffre chiffré** : hôtes, mots de passe, clés et empreintes chiffrés sur l'appareil ; export / import chiffré, plusieurs coffres par PC, code PIN à 6 chiffres en option
 
-```powershell
-git tag v0.2.2
-git push origin v0.2.2
-```
+### Sécurité
 
-Real OpenVPN servers for manual testing: [`tools/openvpn-test`](tools/openvpn-test) (Docker). Run `gen-pki.sh` to create your own test certificates; they are git-ignored.
+| | |
+|---|---|
+| Dérivation de clé | Argon2id (64 Mio, 3 itérations, sel aléatoire) |
+| Chiffrement | XChaCha20-Poly1305, nonce neuf à chaque sauvegarde |
+| Code PIN | Clé du coffre enveloppée par Argon2id(PIN), puis DPAPI Windows |
+| Mémoire | Secrets effacés au verrouillage |
+| Stockage | `%APPDATA%\Escale\Coffre1`, `Coffre2`… |
 
-## Project layout
+Le mot de passe maître n'est jamais stocké : **s'il est perdu, le coffre est irrécupérable.**
+Pas encore audité de façon indépendante — voir [SECURITY.md](SECURITY.md).
 
-```
-src/        application (app.rs UI, ssh.rs, rdp.rs, rfb.rs, vpn.rs, openvpn/, vault.rs, terminal.rs, …)
-assets/     logo and fonts
-vendor/     patched copies of dependencies, see [patch.crates-io] in Cargo.toml
-installer/  Inno Setup script
-tools/      OpenVPN test environment
-```
+**Mode portable :** définir `ESCALE_VAULT=chemin\vers\vault.escale` pour placer le coffre ailleurs (ex. clé USB).
 
-Keyboard shortcuts and the full French documentation are in [README.fr.md](README.fr.md).
+### Raccourcis du terminal
 
-## Contributing
+| Action | Raccourci |
+|---|---|
+| Copier | Ctrl+Maj+C, Ctrl+C (si sélection), clic droit |
+| Coller | Ctrl+V |
+| Défiler l'historique | Molette, Maj+PgUp / PgDn |
+| Panneau Fichiers | Ctrl+Maj+E |
+| Saisir le mot de passe enregistré (sudo / su) | Ctrl+Maj+M |
+| Replier la barre latérale | Ctrl+Maj+B |
 
-Issues and pull requests are welcome: see [CONTRIBUTING.md](CONTRIBUTING.md).
+---
 
-## License
-
-[MIT](LICENSE). Bundled and vendored components keep their own licenses: see [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).
+<p align="center">
+  <a href="LICENSE">MIT</a> · <a href="THIRD_PARTY_NOTICES.md">Third-party notices / Licences tierces</a> · <a href="CONTRIBUTING.md">Contributing</a>
+</p>

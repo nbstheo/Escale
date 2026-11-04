@@ -10,7 +10,6 @@ cargo test --release
 ```
 
 Requirements: Rust (stable, edition 2024) and the Visual Studio Build Tools (C++ workload).
-OpenVPN end-to-end tests that need real servers live in `tools/openvpn-test` (Docker); run `gen-pki.sh` there to generate your own test PKI — never commit the generated keys.
 
 ## Pull requests
 

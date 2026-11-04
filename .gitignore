@@ -1,7 +1,8 @@
-# build
+# build et outils locaux (non publiés)
 /target/
 /dist/
-installer/escale.ico
+/installer/
+/tools/
 *.pdb
 
 # secrets et données locales : ne jamais commiter
@@ -15,9 +16,7 @@ crash.log
 *.pem
 id_*
 
-# matériel de test généré (clés privées, tls-auth/tls-crypt) : à régénérer avec tools/openvpn-test/gen-pki.sh
-/tools/openvpn-test/out/
-/tools/openvpn-test/pki/
+# profils VPN (clés privées, tls-auth/tls-crypt)
 *.ovpn
 !src/**/*.ovpn
 
