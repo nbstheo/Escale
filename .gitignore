@@ -1,0 +1,33 @@
+# build
+/target/
+/dist/
+installer/escale.ico
+*.pdb
+
+# secrets et données locales : ne jamais commiter
+.env
+.env.*
+*.escale
+vault.pin
+profil.json
+crash.log
+*.ppk
+*.pem
+id_*
+
+# matériel de test généré (clés privées, tls-auth/tls-crypt) : à régénérer avec tools/openvpn-test/gen-pki.sh
+/tools/openvpn-test/out/
+/tools/openvpn-test/pki/
+*.ovpn
+!src/**/*.ovpn
+
+# divers
+.vscode/
+.idea/
+.old/
+.DS_Store
+Thumbs.db
+desktop.ini
+*.log
+*.tmp
+*.bak

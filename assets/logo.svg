@@ -1,0 +1,19 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+  <defs>
+    <linearGradient id="accent" gradientUnits="userSpaceOnUse" x1="120" y1="96" x2="400" y2="416">
+      <stop offset="0" stop-color="#2DD4BF"/>
+      <stop offset="1" stop-color="#38BDF8"/>
+    </linearGradient>
+    <!-- marquage au sol : traits découpés (transparents) au milieu de chaque voie, qui raccourcissent vers le bout -->
+    <mask id="marquage" maskUnits="userSpaceOnUse" x="0" y="0" width="512" height="512">
+      <rect width="512" height="512" fill="#fff"/>
+      <g fill="#000">
+        <rect x="236" y="127" width="48" height="8" rx="4"/><rect x="298" y="127" width="30" height="8" rx="4"/>
+        <rect x="236" y="251" width="34" height="8" rx="4"/>
+        <rect x="236" y="375" width="48" height="8" rx="4"/><rect x="298" y="375" width="30" height="8" rx="4"/>
+      </g>
+    </mask>
+  </defs>
+  <polygon mask="url(#marquage)" fill="url(#accent)" stroke="url(#accent)" stroke-width="20" stroke-linejoin="round"
+    points="130,106 388,106 360,158 206,158 206,230 332,230 304,282 206,282 206,354 388,354 360,406 130,406"/>
+</svg>

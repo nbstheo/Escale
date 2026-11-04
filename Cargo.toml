@@ -1,0 +1,101 @@
+[package]
+name = "escale"
+version = "0.2.2"
+edition = "2024"
+description = "Escale - client SSH, RDP et VNC léger, chiffré, avec jump hosts"
+build = "build.rs"
+license = "MIT"
+readme = "README.md"
+publish = false
+
+[dependencies]
+boringtun = { version = "0.7.1", default-features = false }
+arboard = { version = "3.6.1", default-features = false }
+argon2 = "0.6.0"
+chacha20poly1305 = "0.11.0"
+eframe = { version = "0.36.2", default-features = false, features = ["default_fonts", "glow", "wgpu"] }
+ironrdp-connector = "0.10"
+ironrdp-bulk = "0.1"
+ironrdp-cliprdr = "0.7"
+ironrdp-core = "0.2"
+ironrdp-displaycontrol = "0.8"
+ironrdp-dvc = "0.8"
+ironrdp-egfx = { version = "0.3", features = ["openh264-bundled"] }
+ironrdp-graphics = "0.9"
+ironrdp-input = "0.7"
+ironrdp-pdu = "0.9"
+ironrdp-rdpdr = "0.7"
+cpal = "0.18"
+ironrdp-session = "0.11"
+ironrdp-svc = "0.8"
+ironrdp-tls = { version = "0.2", features = ["rustls-ring"] }
+ironrdp-tokio = "0.10"
+openh264 = { version = "0.9.8", default-features = false }
+rand = "0.10.3"
+rfd = "0.17.2"
+russh = { version = "0.63.3", default-features = false, features = ["ring", "flate2", "rsa"] }
+russh-sftp = "3.0.1"
+serde = { version = "1.0.229", features = ["derive"] }
+serde_json = "1.0.151"
+tokio = { version = "1.53.2", features = ["rt-multi-thread", "macros", "sync", "time", "net", "io-util", "fs"] }
+sha2 = "0.11"
+# OpenVPN : canal de contrôle TLS, chiffrement du canal de données, PRF, tls-auth / tls-crypt
+rustls = { version = "0.23", default-features = false, features = ["ring", "std", "tls12", "logging"] }
+rustls-pki-types = { version = "1.15", features = ["std"] }
+ring = "0.17"
+aes = "0.9"
+cbc = "0.2"
+ctr = "0.10"
+hmac = "0.13"
+sha1 = "0.11"
+md-5 = "0.11"
+smoltcp = { version = "0.14", default-features = false, features = ["std", "medium-ip", "proto-ipv4", "proto-ipv6", "socket-tcp", "socket-dns", "dns-max-server-count-4", "dns-max-result-count-4", "iface-max-addr-count-4"] }
+base64 = "0.22"
+socket2 = "0.6"
+uuid = { version = "1.27.0", features = ["v4", "serde"] }
+vnc-rs = "0.6"
+vt100 = "0.16.2"
+zeroize = "1.9.0"
+
+[build-dependencies]
+winresource = "0.1.31"
+
+[profile.release]
+opt-level = 3
+lto = "fat"
+codegen-units = 1
+# une panique isole la session fautive (cf. crash.log) au lieu de fermer Escale
+panic = "unwind"
+strip = true
+
+[dev-dependencies]
+tokio = { version = "1.53.2", features = ["io-util"] }
+# serveur RDP en mémoire pour les tests de bout en bout
+anyhow = "1"
+async-trait = "0.1"
+bytes = "1"
+openh264 = { version = "0.9.8", features = ["source"] }
+ironrdp-server = { version = "0.13", default-features = false }
+# formats audio du serveur de test (son)
+ironrdp-rdpsnd = "0.9"
+rcgen = "0.14"
+tokio-rustls = { version = "0.26", default-features = false, features = ["ring", "tls12"] }
+
+[target."cfg(windows)".dependencies]
+windows-sys = { version = "0.61", features = ["Win32_Security_Cryptography", "Win32_Foundation", "Win32_UI_WindowsAndMessaging", "Win32_UI_Input_KeyboardAndMouse", "Win32_Storage_FileSystem", "Win32_Graphics_Gdi", "Win32_System_DataExchange", "Win32_System_Memory", "Win32_System_LibraryLoader"] }
+winit = { version = "0.30.13", default-features = false }
+
+# IronRDP (via picky 7.0.0-rc.25 et sspi 0.21.3) épingle des pré-versions de curve25519/ed25519/x25519-dalek
+# incompatibles avec celles de russh : copies locales acceptant les versions finales.
+[patch.crates-io]
+picky = { path = "vendor/picky" }
+sspi = { path = "vendor/sspi" }
+# vt100 0.16.2 + correctif : panique après un redimensionnement qui coupe un caractère large
+vt100 = { path = "vendor/vt100" }
+# ironrdp-connector + options absentes d'IronRDP : pipeline graphique (`enable_gfx`), session console (`console_session`), son distant / micro, profondeur de couleur, échelle (facteur appareil)
+ironrdp-connector = { path = "vendor/ironrdp-connector" }
+# ironrdp-egfx : une commande graphique illisible n'interrompt plus le flux d'images
+ironrdp-egfx = { path = "vendor/ironrdp-egfx" }
+# ironrdp-graphics : RemoteFX Progressive conforme à Windows (couleurs, pleine qualité,
+# passes d'amélioration, tuiles différentielles)
+ironrdp-graphics = { path = "vendor/ironrdp-graphics" }
