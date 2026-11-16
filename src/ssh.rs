@@ -2,6 +2,7 @@
 //! La chaîne sert aussi de tunnel aux sessions RDP et VNC (`open_stream`).
 
 use crate::model::{Auth, Host, VpnProfile};
+use crate::net::{self, NetStats};
 use russh::client::{self, Handle};
 use russh::keys::ssh_key::LineEnding;
 use russh::keys::ssh_key::private::Ed25519Keypair;
@@ -43,18 +44,26 @@ pub enum Event {
 pub struct SessionHandle {
     pub tx: mpsc::UnboundedSender<Cmd>,
     pub rx: std::sync::mpsc::Receiver<Event>,
+    /// Débits et latence de la session.
+    pub net: Arc<NetStats>,
 }
 
 #[derive(Clone)]
 pub(crate) struct Events {
     tx: std::sync::mpsc::Sender<Event>,
     ctx: eframe::egui::Context,
+    /// Compteurs réseau de la session : toutes ses connexions (rebonds, reconnexions) s'y ajoutent.
+    net: Arc<NetStats>,
 }
 
 impl Events {
     pub(crate) fn new(ctx: eframe::egui::Context) -> (Self, std::sync::mpsc::Receiver<Event>) {
         let (tx, rx) = std::sync::mpsc::channel();
-        (Self { tx, ctx }, rx)
+        (Self { tx, ctx, net: Arc::default() }, rx)
+    }
+
+    pub(crate) fn net(&self) -> Arc<NetStats> {
+        self.net.clone()
     }
 
     pub(crate) fn send(&self, e: Event) {
@@ -137,10 +146,15 @@ pub(crate) async fn tcp_connect(hostname: &str, port: u16) -> Result<tokio::net:
 }
 
 /// Première connexion d'une chaîne : directe, ou à travers le VPN du premier hôte (`route_vpn`).
-pub(crate) async fn dial(vpn: Option<&VpnProfile>, name: &str, port: u16) -> Result<Box<dyn Stream>, String> {
+/// Le flux compte ses octets dans `stats` ; en TCP direct, la latence y est aussi relevée.
+pub(crate) async fn dial(vpn: Option<&VpnProfile>, name: &str, port: u16, stats: &Arc<NetStats>) -> Result<Box<dyn Stream>, String> {
     match vpn {
-        Some(v) => Ok(Box::new(crate::vpn::connect(v, name, port).await?)),
-        None => Ok(Box::new(tcp_connect(name, port).await?)),
+        Some(v) => Ok(Box::new(net::Counted::new(crate::vpn::connect(v, name, port).await?, stats.clone(), None))),
+        None => {
+            let tcp = tcp_connect(name, port).await?;
+            let watch = net::watch_tcp(&tcp, stats);
+            Ok(Box::new(net::Counted::new(tcp, stats.clone(), watch)))
+        }
     }
 }
 
@@ -165,11 +179,12 @@ pub fn spawn(
     let (tx, cmd_rx) = mpsc::unbounded_channel();
     let (events, rx) = Events::new(ctx);
     let ev = events.clone();
+    let net = events.net();
     rt.spawn(async move {
         let res = isolated(run(chain, cols, rows, cmd_rx, ev)).await;
         events.send(Event::Closed(res.err()));
     });
-    SessionHandle { tx, rx }
+    SessionHandle { tx, rx, net }
 }
 
 /// Exécute une session dans sa propre tâche : une panique interne la ferme avec un message
@@ -187,7 +202,7 @@ where
 
 #[cfg(test)]
 pub(crate) fn test_events(tx: std::sync::mpsc::Sender<Event>) -> Events {
-    Events { tx, ctx: eframe::egui::Context::default() }
+    Events { tx, ctx: eframe::egui::Context::default(), net: Arc::default() }
 }
 
 #[cfg(test)]
@@ -259,7 +274,7 @@ pub(crate) async fn connect_chain_learning(chain: &mut [Host], events: &Events) 
             match handles.last() {
                 None => {
                     // keepalive TCP en plus de celui de SSH : rien ne reste suspendu à une socket morte
-                    let tcp = dial(vpn.as_deref(), &name, port).await.map_err(|e| russh::Error::IO(std::io::Error::other(e)))?;
+                    let tcp = dial(vpn.as_deref(), &name, port, &events.net).await.map_err(|e| russh::Error::IO(std::io::Error::other(e)))?;
                     client::connect_stream(config(), tcp, handler).await
                 }
                 Some(prev) => {
@@ -309,7 +324,7 @@ pub(crate) async fn open_stream_learning(chain: &mut [Host], events: &Events) ->
     let vpn = target.route_vpn.clone().filter(|_| handles.is_empty());
     events.send(Event::Status(format!("Connexion à {}{}…", target.address(), via(vpn.as_deref()))));
     let stream: Box<dyn Stream> = match handles.last() {
-        None => dial(vpn.as_deref(), &target.hostname, target.port).await.map_err(|e| (e, false))?,
+        None => dial(vpn.as_deref(), &target.hostname, target.port, &events.net).await.map_err(|e| (e, false))?,
         Some(last) => {
             let (name, port) = endpoint(&target.hostname, target.port);
             let ch = last
@@ -411,8 +426,12 @@ async fn run(
 
     let (mut rd, wr) = ch.split();
     let mut exit: Option<String> = None;
+    // latence de bout en bout (rebonds compris) ; ne se termine jamais
+    let ping = net::ping_loop(&events.net, || async { target.send_ping().await.is_ok() });
+    tokio::pin!(ping);
     loop {
         tokio::select! {
+            _ = &mut ping => {}
             msg = rd.wait() => match msg {
                 Some(ChannelMsg::Data { data }) | Some(ChannelMsg::ExtendedData { data, .. }) => {
                     events.send(Event::Output(data.to_vec()));

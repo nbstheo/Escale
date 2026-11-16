@@ -1,4 +1,4 @@
-﻿//! Composants d'interface : icônes vectorielles, boutons, champs, code PIN, puces…
+//! Composants d'interface : icônes vectorielles, boutons, champs, code PIN, puces…
 
 use crate::theme::*;
 use eframe::egui::{self, Align2, Color32, FontId, Margin, Pos2, Rect, Response, RichText, Sense, Shape, Stroke, Vec2, pos2, vec2};
@@ -23,6 +23,7 @@ pub enum Icon {
     Folder,
     Back,
     Shield,
+    ShieldOff,
     Warning,
     Hop,
     Terminal,
@@ -161,6 +162,19 @@ pub fn paint_icon(p: &egui::Painter, rect: Rect, icon: Icon, color: Color32) {
                 at(0.5, 0.12),
             ]);
             line(vec![at(0.36, 0.5), at(0.47, 0.61), at(0.66, 0.4)]);
+        }
+        Icon::ShieldOff => {
+            line(vec![
+                at(0.5, 0.12),
+                at(0.82, 0.24),
+                at(0.8, 0.52),
+                at(0.5, 0.88),
+                at(0.2, 0.52),
+                at(0.18, 0.24),
+                at(0.5, 0.12),
+            ]);
+            line(vec![at(0.39, 0.38), at(0.61, 0.6)]);
+            line(vec![at(0.61, 0.38), at(0.39, 0.6)]);
         }
         Icon::Warning => {
             line(vec![at(0.5, 0.14), at(0.88, 0.82), at(0.12, 0.82), at(0.5, 0.14)]);

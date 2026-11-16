@@ -14,6 +14,7 @@ use vnc::{PixelFormat, VncConnector, VncEncoding, VncEvent, X11Event};
 pub fn spawn(rt: &tokio::runtime::Runtime, chain: Vec<Host>, ctx: eframe::egui::Context) -> DesktopHandle {
     let (tx, cmd_rx) = mpsc::unbounded_channel();
     let (events, rx) = Events::new(ctx);
+    let net = events.net();
     let frame: SharedFrame = Arc::new(Mutex::new(Frame::new()));
     let f = frame.clone();
     let ev = events.clone();
@@ -21,7 +22,7 @@ pub fn spawn(rt: &tokio::runtime::Runtime, chain: Vec<Host>, ctx: eframe::egui::
         let res = ssh::isolated(run(chain, cmd_rx, ev, f)).await;
         events.send(Event::Closed(res.err()));
     });
-    DesktopHandle { tx, rx, frame, drive: None }
+    DesktopHandle { tx, rx, frame, drive: None, net }
 }
 
 fn vnc_err(e: vnc::VncError) -> String {

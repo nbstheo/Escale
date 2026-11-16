@@ -35,6 +35,7 @@ pub fn spawn(
 ) -> DesktopHandle {
     let (tx, cmd_rx) = mpsc::unbounded_channel();
     let (events, rx) = Events::new(ctx);
+    let net = events.net();
     let on_spawn_error = events.clone();
     let frame: SharedFrame = Arc::new(Mutex::new(Frame::new()));
     let f = frame.clone();
@@ -55,7 +56,7 @@ pub fn spawn(
         // sans fil, l'onglet resterait « en connexion » indéfiniment
         on_spawn_error.send(Event::Closed(Some(format!("Démarrage de la session impossible : {e}"))));
     }
-    DesktopHandle { tx, rx, frame, drive: Some(drive) }
+    DesktopHandle { tx, rx, frame, drive: Some(drive), net }
 }
 
 /// Client réseau de CredSSP : transmet les requêtes Kerberos au KDC de l'hôte (sans KDC, NTLM est

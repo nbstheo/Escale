@@ -181,6 +181,8 @@ pub struct DesktopHandle {
     pub frame: SharedFrame,
     /// État du lecteur partagé (RDP uniquement).
     pub drive: Option<Arc<crate::rdpdr::DriveStatus>>,
+    /// Débits et latence de la session.
+    pub net: Arc<crate::net::NetStats>,
 }
 
 /// Copie d'une zone (x0, y0, x1, y1 exclusifs) d'une image large de `w` pixels.

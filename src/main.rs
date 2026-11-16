@@ -1,4 +1,4 @@
-﻿#![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
+#![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
 mod app;
 mod audin;
@@ -10,6 +10,7 @@ mod lock;
 mod logo;
 mod model;
 mod monitors;
+mod net;
 mod openvpn;
 mod pin;
 mod rdp;
@@ -22,6 +23,7 @@ mod terminal;
 mod theme;
 #[cfg(test)]
 mod tests;
+mod update;
 mod vault;
 mod vpn;
 mod widgets;

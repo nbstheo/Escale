@@ -1,6 +1,7 @@
-﻿use crate::desktop::{self, DesktopCmd, DesktopHandle, DesktopView};
+use crate::desktop::{self, DesktopCmd, DesktopHandle, DesktopView};
 use crate::files::FileManager;
 use crate::lock::LockScreen;
+use crate::net::{self, Latency, NetStats};
 use crate::model::{Auth, Host, Protocol, RdpAudio, RdpCompression, RdpDisplay, RdpGraphics, RdpOptions, RdpSecurity, VaultData, VpnKind, VpnProfile, OpenVpnProto};
 use crate::pin;
 use crate::ssh::{self, Cmd, Event, SessionHandle};
@@ -44,6 +45,14 @@ impl Session {
             Session::Desktop { handle, .. } => {
                 let _ = handle.tx.send(DesktopCmd::Close);
             }
+        }
+    }
+
+    /// Débits et latence de la session.
+    fn net(&self) -> &NetStats {
+        match self {
+            Session::Term { handle, .. } => &handle.net,
+            Session::Desktop { handle, .. } => &handle.net,
         }
     }
 
@@ -359,6 +368,7 @@ impl EscaleApp {
             .build()
             .expect("runtime tokio");
         let icon = std::sync::Arc::new(egui::IconData { rgba: crate::logo::render(64), width: 64, height: 64 });
+        crate::update::startup(&cc.egui_ctx);
         Self { rt, logo, state: None, lock: LockScreen::new(), fullscreen: false, icon, window_title: "Escale".into() }
     }
 }
@@ -2570,7 +2580,7 @@ impl Unlocked {
 
                 ui.add_space(16.0);
                 w::section_title(ui, "À propos");
-                ui.label(RichText::new(format!("Escale {}", env!("CARGO_PKG_VERSION"))).color(TEXT_DIM));
+                crate::update::about(ui);
                 ui.label(RichText::new(self.vault.path().display().to_string()).monospace().size(11.5).color(MUTED));
                 ui.add_space(6.0);
             });
@@ -4194,6 +4204,83 @@ fn session_rail(ui: &mut egui::Ui, tab: &Tab, i: usize, has_key: bool, actions: 
             actions.push(Action::TaskManager(i));
         }
     }
+    rail_net(ui, tab);
+}
+
+/// Bouclier de la session : icône, couleur et explication (chiffrée ou non).
+fn shield(p: Protocol) -> (Icon, Color32, &'static str) {
+    match p {
+        Protocol::Ssh => (Icon::Shield, ACCENT, "Connexion chiffrée (SSH)"),
+        Protocol::Rdp => (Icon::Shield, ACCENT, "Connexion chiffrée (TLS)"),
+        Protocol::Vnc => (Icon::ShieldOff, WARN, "Connexion non chiffrée : VNC ne chiffre pas par lui-même (hors VPN ou rebond SSH)"),
+    }
+}
+
+/// Latence affichée et sa couleur ; `lost` : texte quand l'hôte ne répond plus.
+fn latency_text(l: Latency, lost: &str) -> (String, Color32) {
+    match l {
+        Latency::Ms(ms) => (format!("{ms} ms"), if ms >= 400 { DANGER } else if ms >= 150 { WARN } else { TEXT_DIM }),
+        Latency::Lost => (lost.to_string(), DANGER),
+        Latency::Unknown => ("— ms".to_string(), MUTED),
+    }
+}
+
+/// Petite flèche vers le bas (reçu) ou le haut (envoyé), dessinée : les polices embarquées n'ont pas ces glyphes.
+fn paint_arrow(p: &egui::Painter, c: egui::Pos2, down: bool, col: Color32) {
+    let (h, a, d) = (4.0, 2.6, if down { 1.0 } else { -1.0 });
+    let st = Stroke::new(1.3, col);
+    let tip = pos2(c.x, c.y + h * d);
+    p.line_segment([pos2(c.x, c.y - h * d), tip], st);
+    p.line_segment([pos2(c.x - a, tip.y - a * d), tip], st);
+    p.line_segment([pos2(c.x + a, tip.y - a * d), tip], st);
+}
+
+/// Bas de la colonne de session : bouclier (chiffré ou non), latence vers l'hôte, débits reçu et envoyé.
+fn rail_net(ui: &mut egui::Ui, tab: &Tab) {
+    const H: f32 = 64.0;
+    let rest = ui.available_height();
+    if !matches!(tab.state, TabState::Connected) || rest < H + 8.0 {
+        return;
+    }
+    ui.add_space(rest - H);
+    let (rect, resp) = ui.allocate_exact_size(vec2(ui.available_width(), H), Sense::hover());
+    let stats = tab.session.net();
+    let (icon, col, tip) = shield(tab.protocol);
+    let cx = rect.center().x + 1.0;
+    // les débits peuvent mordre sur la marge de la colonne
+    let p = ui.painter().with_clip_rect(rect.expand2(vec2(8.0, 0.0)));
+    w::paint_icon(&p, Rect::from_center_size(pos2(cx, rect.top() + 10.0), Vec2::splat(17.0)), icon, col);
+    let font = FontId::proportional(10.0);
+    let (lat, lat_col) = latency_text(stats.latency(), "coupé");
+    p.text(pos2(cx, rect.top() + 28.0), Align2::CENTER_CENTER, lat, font.clone(), lat_col);
+    let (down, up) = stats.rates();
+    for (k, (rate, is_down)) in [(down, true), (up, false)].into_iter().enumerate() {
+        let y = rect.top() + 41.0 + 12.0 * k as f32;
+        let g = p.layout_no_wrap(net::fmt_rate(rate), font.clone(), TEXT_DIM);
+        let x0 = cx - (8.0 + g.size().x) / 2.0;
+        paint_arrow(&p, pos2(x0 + 2.5, y), is_down, MUTED);
+        p.galley(pos2(x0 + 8.0, y - g.size().y / 2.0), g, TEXT_DIM);
+    }
+    ui.ctx().request_repaint_after(std::time::Duration::from_secs(1));
+    resp.on_hover_text(format!("{tip}\nLatence vers l'hôte, débit reçu et débit envoyé"));
+}
+
+/// Même indicateur, en ligne, dans la barre flottante (plein écran, fenêtre séparée).
+fn toolbar_net(ui: &mut egui::Ui, tab: &Tab) {
+    let stats = tab.session.net();
+    let (icon, col, tip) = shield(tab.protocol);
+    ui.add_space(6.0);
+    w::icon_size(ui, icon, 15.0, col).on_hover_text(tip);
+    let (lat, lat_col) = latency_text(stats.latency(), "sans réponse");
+    ui.label(RichText::new(lat).size(12.0).color(lat_col)).on_hover_text("Latence vers l'hôte");
+    let (down, up) = stats.rates();
+    for (rate, is_down, tip) in [(down, true, "Débit reçu"), (up, false, "Débit envoyé")] {
+        ui.add_space(4.0);
+        let (r, _) = ui.allocate_exact_size(vec2(7.0, 28.0), Sense::hover());
+        paint_arrow(ui.painter(), r.center(), is_down, MUTED);
+        ui.label(RichText::new(net::fmt_rate(rate)).size(12.0).color(TEXT_DIM)).on_hover_text(tip);
+    }
+    ui.ctx().request_repaint_after(std::time::Duration::from_secs(1));
 }
 
 /// Pendant la connexion d'un bureau graphique : indicateur et dernière étape.
@@ -4436,6 +4523,9 @@ fn session_toolbar(ui: &mut egui::Ui, area: Rect, tab: &mut Tab, i: usize, mode:
                     let (r, _) = ui.allocate_exact_size(vec2(14.0, 28.0), Sense::hover());
                     ui.painter().circle_filled(r.center(), 4.0, dot);
                     ui.label(RichText::new(tab.title()).font(bold(13.0)));
+                    if matches!(tab.state, TabState::Connected) {
+                        toolbar_net(ui, tab);
+                    }
                     // plein écran, fenêtre séparée : pas de bandeau d'erreur, la cause s'affiche ici
                     if let TabState::Closed(Some(e)) = &tab.state {
                         ui.add_space(4.0);
@@ -4624,6 +4714,7 @@ impl EscaleApp {
                 self.state = Some(Unlocked::new(vault, data));
                 self.lock = LockScreen::new();
             }
+            crate::update::banner(&ctx);
             w::window_frame(&ctx);
             return;
         };
@@ -4859,6 +4950,7 @@ impl EscaleApp {
         st.paste_modal(&ctx);
         st.key_setup_modal(&ctx);
         st.error_modal(&ctx);
+        crate::update::banner(&ctx);
         w::window_frame(&ctx);
 
         let mut lock = false;
@@ -5340,7 +5432,7 @@ mod resize_tests {
             host_id: Uuid::new_v4(),
             title: "Bureau".into(),
             protocol: Protocol::Rdp,
-            session: Session::Desktop { view: DesktopView::new(Protocol::Rdp).with_options(opts), handle: DesktopHandle { tx, rx, frame, drive: None } },
+            session: Session::Desktop { view: DesktopView::new(Protocol::Rdp).with_options(opts), handle: DesktopHandle { tx, rx, frame, drive: None, net: Default::default() } },
             state: TabState::Connecting,
             status: "Connexion…".into(),
             activity: false,
@@ -5383,7 +5475,7 @@ mod resize_tests {
         let (_etx, rx) = std::sync::mpsc::channel();
         let (mut tab, _) = desktop_tab(RdpDisplay::Dynamic);
         tab.protocol = Protocol::Ssh;
-        tab.session = Session::Term { term: Terminal::new(100), handle: SessionHandle { tx, rx } };
+        tab.session = Session::Term { term: Terminal::new(100), handle: SessionHandle { tx, rx, net: Default::default() } };
         tab.state = TabState::Connected;
         tab.has_password = true;
         let settings = crate::model::Settings::default();
@@ -5462,6 +5554,29 @@ mod resize_tests {
         let _ = one_frame(&ctx, |ui| session_toolbar(ui, ui.max_rect(), &mut tab, 0, ToolbarMode::Popup { fullscreen: true }, &mut actions));
         let out = one_frame(&ctx, |ui| session_toolbar(ui, ui.max_rect(), &mut tab, 0, ToolbarMode::Popup { fullscreen: true }, &mut actions));
         assert!(painted_text(&out).contains("Hôte injoignable"), "{}", painted_text(&out));
+    }
+
+    #[test]
+    fn network_indicator_shows_only_on_a_connected_session() {
+        let ctx = egui::Context::default();
+        crate::theme::apply(&ctx);
+        let (mut tab, _cmds) = desktop_tab(RdpDisplay::default());
+        let mut actions = Vec::new();
+        // en connexion : ni bouclier ni débits
+        let out = one_frame(&ctx, |ui| session_rail(ui, &tab, 0, false, &mut actions));
+        assert!(!painted_text(&out).contains("o/s"), "{}", painted_text(&out));
+        // connecté : latence (inconnue sans connexion réelle) et débits, dans la colonne et la barre flottante
+        session_state(&mut tab, Event::Connected);
+        let out = one_frame(&ctx, |ui| session_rail(ui, &tab, 0, false, &mut actions));
+        let text = painted_text(&out);
+        assert!(text.contains("— ms") && text.matches("0 o/s").count() == 2, "{text}");
+        let _ = one_frame(&ctx, |ui| session_toolbar(ui, ui.max_rect(), &mut tab, 0, ToolbarMode::Popup { fullscreen: true }, &mut actions));
+        let out = one_frame(&ctx, |ui| session_toolbar(ui, ui.max_rect(), &mut tab, 0, ToolbarMode::Popup { fullscreen: true }, &mut actions));
+        let text = painted_text(&out);
+        assert!(text.contains("— ms") && text.matches("0 o/s").count() == 2, "{text}");
+        assert!(matches!(shield(Protocol::Vnc).0, Icon::ShieldOff) && matches!(shield(Protocol::Ssh).0, Icon::Shield));
+        assert_eq!(latency_text(Latency::Lost, "coupé"), ("coupé".to_string(), DANGER));
+        assert_eq!(latency_text(Latency::Ms(180), "coupé"), ("180 ms".to_string(), WARN));
     }
 
     #[test]

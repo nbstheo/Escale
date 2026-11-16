@@ -1,6 +1,6 @@
 [package]
 name = "escale"
-version = "0.2.2"
+version = "0.2.3"
 edition = "2024"
 description = "Escale - client SSH, RDP et VNC léger, chiffré, avec jump hosts"
 build = "build.rs"
@@ -82,7 +82,7 @@ rcgen = "0.14"
 tokio-rustls = { version = "0.26", default-features = false, features = ["ring", "tls12"] }
 
 [target."cfg(windows)".dependencies]
-windows-sys = { version = "0.61", features = ["Win32_Security_Cryptography", "Win32_Foundation", "Win32_UI_WindowsAndMessaging", "Win32_UI_Input_KeyboardAndMouse", "Win32_Storage_FileSystem", "Win32_Graphics_Gdi", "Win32_System_DataExchange", "Win32_System_Memory", "Win32_System_LibraryLoader"] }
+windows-sys = { version = "0.61", features = ["Win32_Security_Cryptography", "Win32_Foundation", "Win32_UI_WindowsAndMessaging", "Win32_UI_Input_KeyboardAndMouse", "Win32_Storage_FileSystem", "Win32_Graphics_Gdi", "Win32_System_DataExchange", "Win32_System_Memory", "Win32_System_LibraryLoader", "Win32_Networking_WinHttp", "Win32_Networking_WinSock", "Win32_System_IO"] }
 winit = { version = "0.30.13", default-features = false }
 
 # IronRDP (via picky 7.0.0-rc.25 et sspi 0.21.3) épingle des pré-versions de curve25519/ed25519/x25519-dalek
